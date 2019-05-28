@@ -229,14 +229,18 @@ Create a new branch in your repository
 git checkout -b feature/services
 ```
 
-Look at the code in `workshop/openshift_info.py` and try to add a method similar to `get_pods`, but instead of a list of Pod names, make it to return list of Service names
+Look at the code in `workshop/openshift_info.py` and try to implement a method similar to `get_pods`, but instead of a list of Pod names, make it to return list of Service names
 
 <details><summary>Solution</summary>
 <p>
 
+File `workshop/openshift_info.py`
+
 ```python
     def get_services(self):
-        services_api = self.oapi_client.resources.get(kind='Service', api_version='v1')
+        services_api = self.oapi_client.resources.get(
+                            kind='Service',
+                            api_version='v1')
         service_list = services_api.get(namespace=self.namespace)
         return self._get_names(service_list)
 ```
@@ -244,9 +248,118 @@ Look at the code in `workshop/openshift_info.py` and try to add a method similar
 </p>
 </details>
 
+#### Configure a build config to pull from a branch
 
-# Tasks
+You are now making changes to your code in a new branch, but the build config is pulling from `master`. To make sure you build from the latest changes, we will need to add `ref` to our build config.
 
+```
+oc edit bc openshift-intern-workshop
+```
 
-## Add a PVC and persist the "iam" file
-## Fix inconsistent return type in API methods
+Find a section `source` and in there find `uri`, which should point to your repository fork. Add the following line right under the `uri` field and make sure the indentation is the same
+
+```
+ref: feature/services
+```
+
+To verify the change, go to OpenShift Console > Builds > Builds > openshift-intern-workshop > Configuration and check the value of *Source Ref:*
+
+You can now commit and push your changes
+
+```
+git commit -a -m "Add service list to API"
+git push --set-upstream origin feature/services
+```
+Look at the OpenShift Console > Builds > Builds > openshift-intern-workshop > History - you will see a new build running, if your webhook is configured correctly. Wait for the build and following deployment to finish and reload your application - you should see a service listed there as well now.
+
+### Adding persistent volumes
+
+Sometimes an application needs some persisentcy. The most classic example are databases - without a persistent volume all the data you store would be lost on container restart - and restarts happen a lot in a distributed cloud environment.
+
+To simulate this situation, we have an endpoint in our app which stores a value in a file. First get the route of the app and store it in environment variable
+
+```
+APP_URL=$(oc get route openshift-intern-workshop -o jsonpath='{.spec.host}')
+```
+
+Next try to query the `/iam` endpoint
+
+```
+curl $APP_URL/iam
+```
+
+You will see a message: `Could not find the 'iam' file`
+
+We need to set the value first by doing a POST request to the enpoint
+
+```
+curl -X POST $APP_URL/iam/<YOUR_NAME_HERE>
+```
+
+If this succeeded, you should get your name back when you do the GET request on the endpoint again
+
+```
+curl $APP_URL/iam
+```
+
+Now let's delete/restart the pod and see that the value is gone
+
+```
+POD=$(oc get pods | grep Running | awk '{print $1}')
+oc delete pod $POD
+```
+
+Hit the endpoint again when the pod comes back up
+
+```
+curl $APP_URL/iam
+```
+
+As you can see, the value is gone. So let's make sure it gets properly persisted next time - let's add a **persisten volume** to our application. OpenShift uses something called **dynamic provisioning** to generate persistent volume based on **persistent volume claims** (or PVCs). Our task is only to create a PVC artifact and attach it to the pod and OpenShift will handle the rest.
+
+Ideally you would do this by adding another YAML files to your git repository, but for the sake of simplicity, let's do it manually form the OpenShift Console. Go to the console > Applications > Deployments > openshift-intern-workshop > Actions > Add storage.
+
+Give your new PVC a name and size (e.g. 1 GB). Click Create. Then provide a mount path - if you look into `app.py` file, you'll notice that the value submitted to the `/iam` endpoint is stored in a file `./iam`. The full path to the file is `/opt/app-root/src/iam`. As the `/opt/app-root/src` directory contains our application, we will want to persist the file in a subdirectory. For that set the *Mount Path* to
+
+```
+/opt/app-root/src/data
+```
+
+and click *Add*.
+
+We need to change the path in the source code as well - edit the `app.py` file and set the `IAM_FILE` value to `/opt/app-root/src/data/iam` - the line will now look like this:
+
+```
+IAM_FILE = "/opt/app-root/src/data/iam"
+```
+
+To get the change in we need to rebuild the container image - you can push the change to your repository, or use the build from a local dir - you have tried both before.
+
+```
+ oc start-build openshift-intern-workshop --from-dir=. -F
+```
+
+Once the image is rebuilt and the application redeployed, we can send the `POST` request again
+
+```
+curl -X POST $APP_URL/iam/<YOUR_NAME_HERE>
+```
+
+Then check the value is set properly
+
+```
+curl $APP_URL/iam
+```
+
+Delete (restart) the pod
+
+```
+POD=$(oc get pods | grep Running | awk '{print $1}')
+oc delete pod $POD
+```
+
+and when it comes back up, see that the value is still there
+
+```
+curl $APP_URL/iam
+```
