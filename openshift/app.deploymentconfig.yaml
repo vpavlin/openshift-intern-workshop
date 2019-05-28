@@ -1,0 +1,49 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+  labels:
+    app: openshift-intern-workshop
+  name: openshift-intern-workshop
+spec:
+  replicas: 1
+  selector:
+    app: openshift-intern-workshop
+    deploymentconfig: openshift-intern-workshop
+  strategy:
+    activeDeadlineSeconds: 21600
+    resources: {}
+    type: Rolling
+  template:
+    metadata:
+      labels:
+        app: openshift-intern-workshop
+        deploymentconfig: openshift-intern-workshop
+    spec:
+      containers:
+      - env:
+        - name: PORT
+          value: "5000"
+        - name: SECRET
+          valueFrom:
+            secretKeyRef:
+              key: secret
+              name: openshift-intern-workshop
+        imagePullPolicy: Always
+        name: openshift-intern-workshop
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+  triggers:
+  - type: ConfigChange
+  - imageChangeParams:
+      automatic: true
+      containerNames:
+      - openshift-intern-workshop
+      from:
+        kind: ImageStreamTag
+        name: openshift-intern-workshop:latest
+    type: ImageChange

@@ -1,0 +1,34 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  labels:
+    app: openshift-intern-workshop
+  name: openshift-intern-workshop
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: openshift-intern-workshop:latest
+  source:
+    git:
+      uri: https://github.com/vpavlin/openshift-intern-workshop
+    type: Git
+  strategy:
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: python-36:latest
+    type: Source
+  successfulBuildsHistoryLimit: 5
+  triggers:
+  - github:
+      secret: R0_vqLZduOGcAhCetEuJ
+    type: GitHub
+  - generic:
+      secret: BrRXVtr3ojJkX6_VGzLD
+    type: Generic
+  - type: ConfigChange
+  - imageChange: {}
+    type: ImageChange
+status:
+  lastVersion: 0
