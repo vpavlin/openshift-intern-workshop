@@ -24,6 +24,9 @@ class OpenShiftWorkshop(object):
         pod_list = pods_api.get(namespace=self.namespace)
         return self._get_running_pods(pod_list)
 
+    def get_services(self):
+        return []
+
     def get_self(self):
         return os.environ.get("HOSTNAME")
 

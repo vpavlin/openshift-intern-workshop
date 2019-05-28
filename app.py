@@ -28,8 +28,13 @@ def main():
     pods = openshift_workshop.get_pods()
     me = openshift_workshop.get_self()
     routes = openshift_workshop.get_routes()
+    services = openshift_workshop.get_services()
 
-    return jsonify({"pods": pods, "me": me, "routes": routes})
+    return jsonify({
+            "pods": pods,
+            "me": me,
+            "routes": routes,
+            "services": services})
 
 
 @app.route('/iam')
